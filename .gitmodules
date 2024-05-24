@@ -1,0 +1,3 @@
+[submodule "toughsat"]
+	path = toughsat
+	url = git@github.com:matteodefra/toughsat.git
