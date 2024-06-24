@@ -1,12 +1,11 @@
 import networkx as nx
-import numpy as np
 
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 
 def create_clauses(cnf):
   '''
-    Take a dimacs formatted clause and convert it to a graph
+    Take a dimacs formatted clause and convert it to a dictionary
   '''
 
   infos = cnf.split( "\n" )
@@ -38,6 +37,90 @@ def create_clauses(cnf):
 
 
   return n_vars, n_clauses, clauses
+
+
+def simplify_SAT( clauses : dict, n_vars, n_clauses ): 
+  '''
+    Simplify a SAT formula recursively by removing literals which appear alone
+    and in the other clauses
+  '''
+
+  notfinished = True
+
+  while notfinished:
+
+    clauses_one_lit = []
+
+    for k,v in clauses.items():
+
+      clause_size = len( v )
+      
+      # This clause has exactly one variable
+      if clause_size == 1:
+        clauses_one_lit.append( k )
+
+    if not clauses_one_lit:
+      notfinished = False
+    else:
+      
+      vars = {}
+
+      for toremove in clauses_one_lit:
+        
+        var = clauses[toremove][0]
+        if var < 0:
+          vars[var] = False
+        else:
+          vars[var] = True
+
+      for j in range( n_clauses ):
+
+        if j in clauses_one_lit:
+          del clauses[j]
+
+      for var,value in vars.items():
+        
+        for k,v in clauses.items():
+
+          removing = True
+          while removing:
+            if var in v:
+              del clauses[k]
+            elif (-var) in v:
+              v.remove(-var)
+              clauses[k] = v
+            else:
+              removing = False
+
+      # Now we reindex the clauses
+      clauses = dict(enumerate(clauses.values()))
+      # Now we need to reindex all the variables
+
+      var_sorted = list(sorted( list(vars.keys()), reverse=False ))
+
+      for i in range(len(var_sorted)):
+        
+        curr_abs = abs(var_sorted[i])
+
+        for k,v in clauses.items():
+
+          literals = v
+          
+          for l in range(len(literals)):
+            
+            lit_abs = abs(literals[l])
+
+            if lit_abs + 1 > curr_abs:
+              if literals[l] < 0: literals[l] += 1
+              else: literals[l] -= 1
+
+          clauses[k] = literals
+
+
+  new_vars = n_vars - len(var_sorted)
+  new_clauses = len(clauses)
+
+  return new_vars, new_clauses, clauses
 
 
 def create_nodes_edges( n_vars, n_clauses, clauses ):

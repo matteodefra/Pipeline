@@ -1,3 +1,6 @@
 [submodule "toughsat"]
 	path = toughsat
 	url = git@github.com:matteodefra/toughsat.git
+[submodule "kernel-mis"]
+	path = kernel-mis
+	url = git@github.com:matteodefra/kernel-mis.git

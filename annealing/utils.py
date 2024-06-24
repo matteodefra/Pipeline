@@ -1,6 +1,6 @@
 import pickle
 import networkx as nx
-
+import os
 
 
 def embed( G ):
@@ -11,7 +11,7 @@ def embed( G ):
 def getGraphs():
   # We get the graph instances which are possibly suitable for a 3d version
   # Max degree \Delta <= 6
-  with open( "filtered_instances.pkl", "rb" ) as f:
+  with open( f"{os.getcwd()}/generator/graphs/instances.pkl", "rb" ) as f:
     dic = pickle.load( f )
 
   return dic
