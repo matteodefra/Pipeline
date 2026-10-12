@@ -13,6 +13,7 @@ def create_clauses(cnf):
   clauses = {}
 
   n_clause = 0
+  literals = 0
 
   for line in infos:
     line = line.strip()
@@ -33,94 +34,199 @@ def create_clauses(cnf):
           if variable != 0:
             # Let's save the clause
             clauses[n_clause].append( variable )
+            literals += 1
         n_clause += 1
 
 
-  return n_vars, n_clauses, clauses
+  return n_vars, n_clauses, clauses, literals
 
+def simplify_SAT(clauses: dict, n_vars: int, n_clauses: int):
+    """
+    Simplify a SAT formula recursively by unit propagation.
+    
+    clauses: dict[int, list[int]]
+        Example: {0: [1, -3], 1: [2], 2: [-1, 4]}
+    n_vars: int
+        Number of variables
+    n_clauses: int
+        Number of clauses (not strictly needed, but kept for compatibility)
 
-def simplify_SAT( clauses : dict, n_vars, n_clauses ): 
-  '''
-    Simplify a SAT formula recursively by removing literals which appear alone
-    and in the other clauses
-  '''
+    Returns:
+        new_vars, new_clauses, new_formula, n_literals
+    """
 
-  notfinished = True
+    # Work on a copy so the input is not modified outside
+    clauses = {k: list(v) for k, v in clauses.items()}
+    removed_variables = set()
 
-  while notfinished:
+    changed = True
+    while changed:
+        changed = False
 
-    clauses_one_lit = []
+        # Find all current unit clauses
+        unit_assignments = {}
+        unit_clause_keys = []
 
-    for k,v in clauses.items():
+        for k, v in clauses.items():
+            if len(v) == 1:
+                lit = v[0]
+                var = abs(lit)
+                val = (lit > 0)
 
-      clause_size = len( v )
+                # Optional: detect contradiction x and -x both as unit clauses
+                if var in unit_assignments and unit_assignments[var] != val:
+                    raise ValueError(f"Contradiction detected on variable {var}")
+
+                unit_assignments[var] = val
+                unit_clause_keys.append(k)
+
+        if not unit_clause_keys:
+            break
+
+        changed = True
+        removed_variables.update(unit_assignments.keys())
+
+        new_clauses_dict = {}
+        new_idx = 0
+
+        for k, clause in clauses.items():
+            # Skip the unit clauses themselves
+            if k in unit_clause_keys:
+                continue
+
+            satisfied = False
+            new_clause = []
+
+            for lit in clause:
+                var = abs(lit)
+
+                if var not in unit_assignments:
+                    new_clause.append(lit)
+                else:
+                    assigned_val = unit_assignments[var]
+
+                    # literal is satisfied
+                    if (lit > 0 and assigned_val) or (lit < 0 and not assigned_val):
+                        satisfied = True
+                        break
+                    # otherwise literal is false, so we drop it
+
+            if not satisfied:
+                # If new_clause becomes empty, formula is unsatisfiable under propagation
+                if len(new_clause) == 0:
+                    raise ValueError("Empty clause generated: formula is unsatisfiable")
+                new_clauses_dict[new_idx] = new_clause
+                new_idx += 1
+
+        clauses = new_clauses_dict
+
+    # Build rescaling map for variables that remain
+    remaining_vars = sorted(
+        {abs(lit) for clause in clauses.values() for lit in clause}
+    )
+
+    old_to_new = {old_var: new_var for new_var, old_var in enumerate(remaining_vars, start=1)}
+
+    # Apply rescaling
+    rescaled_clauses = {}
+    for k, clause in clauses.items():
+        new_clause = []
+        for lit in clause:
+            old_var = abs(lit)
+            new_var = old_to_new[old_var]
+            new_clause.append(new_var if lit > 0 else -new_var)
+        rescaled_clauses[k] = new_clause
+
+    new_vars = len(remaining_vars)
+    new_clauses = len(rescaled_clauses)
+    n_literals = sum(len(v) for v in rescaled_clauses.values())
+
+    return new_vars, new_clauses, rescaled_clauses, n_literals
+# def simplify_SAT( clauses : dict, n_vars, n_clauses ): 
+#   '''
+#     Simplify a SAT formula recursively by removing literals which appear alone
+#     and in the other clauses
+#   '''
+
+#   notfinished = True
+
+#   while notfinished:
+
+#     clauses_one_lit = []
+
+#     for k,v in clauses.items():
+
+#       clause_size = len( v )
       
-      # This clause has exactly one variable
-      if clause_size == 1:
-        clauses_one_lit.append( k )
+#       # This clause has exactly one variable
+#       if clause_size == 1:
+#         clauses_one_lit.append( k )
 
-    if not clauses_one_lit:
-      notfinished = False
-    else:
+#     if not clauses_one_lit:
+#       notfinished = False
+#     else:
       
-      vars = {}
+#       vars = {}
 
-      for toremove in clauses_one_lit:
+#       for toremove in clauses_one_lit:
         
-        var = clauses[toremove][0]
-        if var < 0:
-          vars[var] = False
-        else:
-          vars[var] = True
+#         var = clauses[toremove][0]
+#         if var < 0:
+#           vars[var] = False
+#         else:
+#           vars[var] = True
 
-      for j in range( n_clauses ):
+#       for j in range( n_clauses ):
 
-        if j in clauses_one_lit:
-          del clauses[j]
+#         if j in clauses_one_lit:
+#           del clauses[j]
 
-      for var,value in vars.items():
+#       for var,value in vars.items():
         
-        for k,v in clauses.items():
+#         for k,v in clauses.items():
 
-          removing = True
-          while removing:
-            if var in v:
-              del clauses[k]
-            elif (-var) in v:
-              v.remove(-var)
-              clauses[k] = v
-            else:
-              removing = False
+#           removing = True
+#           while removing:
+#             if var in v:
+#               del clauses[k]
+#             elif (-var) in v:
+#               v.remove(-var)
+#               clauses[k] = v
+#             else:
+#               removing = False
 
-      # Now we reindex the clauses
-      clauses = dict(enumerate(clauses.values()))
-      # Now we need to reindex all the variables
+#       # Now we reindex the clauses
+#       clauses = dict(enumerate(clauses.values()))
+#       # Now we need to reindex all the variables
 
-      var_sorted = list(sorted( list(vars.keys()), reverse=False ))
+#       var_sorted = list(sorted( list(vars.keys()), reverse=False ))
 
-      for i in range(len(var_sorted)):
+#       for i in range(len(var_sorted)):
         
-        curr_abs = abs(var_sorted[i])
+#         curr_abs = abs(var_sorted[i])
 
-        for k,v in clauses.items():
+#         for k,v in clauses.items():
 
-          literals = v
+#           literals = v
           
-          for l in range(len(literals)):
+#           for l in range(len(literals)):
             
-            lit_abs = abs(literals[l])
+#             lit_abs = abs(literals[l])
 
-            if lit_abs + 1 > curr_abs:
-              if literals[l] < 0: literals[l] += 1
-              else: literals[l] -= 1
+#             if lit_abs + 1 > curr_abs:
+#               if literals[l] < 0: literals[l] += 1
+#               else: literals[l] -= 1
 
-          clauses[k] = literals
+#           clauses[k] = literals
 
 
-  new_vars = n_vars - len(var_sorted)
-  new_clauses = len(clauses)
+#   new_vars = n_vars - len(var_sorted)
+#   new_clauses = len(clauses)
 
-  return new_vars, new_clauses, clauses
+#   n_literals = 0 
+#   for k,v in clauses.items(): n_literals += len(v)
+
+#   return new_vars, new_clauses, clauses, n_literals
 
 
 def create_nodes_edges( n_vars, n_clauses, clauses ):
@@ -342,6 +448,12 @@ def transformCNF( n_vars, n_clauses, clauses, desiredK = 3 ):
     if len(vars) > desiredK:
       # We find a clause with more than desiredK variables
       clauses_to_split.append( idx )
+
+    # elif len(vars) < desiredK:
+    #   # augment the clause itself with the same literal
+    #   lit = vars[0]
+    #   while len(clauses[idx]) != desiredK:
+    #     clauses[idx].append( lit )
 
   # Now we split all the clauses exceeding the limit desiredK
   for clause_idx in clauses_to_split:

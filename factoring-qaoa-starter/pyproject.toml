@@ -1,0 +1,47 @@
+[project]
+name = "factoring-qaoa"
+version = "0.1.0"
+description = "Analytical and numerical study of QAOA for factoring-derived MIS graphs"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "numpy>=2.0,<3",
+  "scipy>=1.14,<2",
+  "networkx>=3.4,<4",
+  "pandas>=2.2,<3",
+  "matplotlib>=3.9,<4",
+  "sympy>=1.13,<2",
+  "pyyaml>=6,<7",
+]
+
+[project.optional-dependencies]
+solvers = [
+  "ortools>=9.11,<10",
+  "python-sat>=1.8.dev13",
+]
+quantum = [
+  "pennylane>=0.44,<0.46",
+  "quimb>=1.11,<2",
+  "cotengra>=0.7,<1",
+]
+
+[dependency-groups]
+dev = [
+  "jupyterlab>=4.3,<5",
+  "pytest>=8.3,<9",
+  "ruff>=0.9,<1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/factoring_qaoa"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
